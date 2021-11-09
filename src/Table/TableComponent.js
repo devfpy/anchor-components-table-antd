@@ -1,7 +1,7 @@
 /*
  * @Author: devfpy
  * @Date: 2021-11-06 16:43:52
- * @LastEditTime: 2021-11-06 20:51:15
+ * @LastEditTime: 2021-11-08 18:31:07
  * @LastEditors: devfpy
  * @Description:
  */
@@ -49,7 +49,7 @@ class TableComponent extends Component {
     hasHeader: PropTypes.bool,
     hasBorder: PropTypes.bool,
     useVirtual: PropTypes.bool,
-    scroll: PropTypes.scroll,
+    scroll: PropTypes.object,
     maxBodyHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     getProps: PropTypes.func,
     onResizeChange: PropTypes.func
