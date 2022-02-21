@@ -8,11 +8,48 @@
 import React, { Component } from 'react'
 import PropTypes from 'prop-types'
 import { Table } from 'antd'
+import { Resizable } from 'react-resizable'
+import './index.css'
 
 const TableSelectionMode = {
   TableSelectionModeNone: 'none',
   TableSelectionModeSingle: 'radio',
   TableSelectionModeMultiple: 'checkbox'
+}
+
+const ResizableTitle = (props) => {
+  const { onResize, width, ...restProps } = props
+
+  if (!width) {
+    return <th {...restProps} />
+  }
+
+  return (
+    <Resizable
+      width={width}
+      height={0}
+      handle={
+        <span
+          style={{
+            position: 'absolute',
+            right: '-5px',
+            bottom: '0',
+            zIndex: '1',
+            width: '10px',
+            height: '100%',
+            cursor: 'col-resize'
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+          }}
+        />
+      }
+      onResize={onResize}
+      draggableOpts={{ enableUserSelectHack: false }}
+    >
+      <th {...restProps} />
+    </Resizable>
+  )
 }
 
 class TableComponent extends Component {
@@ -73,12 +110,64 @@ class TableComponent extends Component {
     super(props)
 
     this.state = {
+      columnWidth: {},
+      scroll: {},
       selectedRowKeys: [],
       selectedRowData: [],
       currentPage: 1
     }
 
     this.tableRef = React.createRef()
+  }
+
+  componentDidMount() {
+    let { cols, scroll } = this.props
+    this.analysisTableColumnsConfig(cols, scroll)
+  }
+
+  shouldComponentUpdate(nextProps, nextState) {
+    if (nextProps.cols != this.props.cols) {
+      let { cols, scroll } = nextProps
+      this.analysisTableColumnsConfig(cols, scroll)
+    }
+    return true
+  }
+
+  /**
+   * 解析table column配置信息
+   * @param {*} cols
+   * @param {*} scroll
+   */
+  analysisTableColumnsConfig = (cols, scroll) => {
+    let columnWidth = {}
+    let scrollX = scroll?.x || 0
+    if (cols && cols != null) {
+      cols.map((ele) => {
+        let { dataIndex, width, resizable = false } = ele
+        if (
+          dataIndex &&
+          dataIndex != null &&
+          _.isNumber(width) &&
+          !_.isNaN(width)
+        ) {
+          columnWidth[dataIndex] = width
+        }
+
+        // if (dataIndex && dataIndex != null && resizable == true) {
+        //   ele['onHeaderCell'] = (column) => ({
+        //     width: columnWidth[dataIndex],
+        //     onResize: (event, obj) => {
+        //       this.handleResize(dataIndex, event, obj)
+        //     }
+        //   })
+        // }
+      })
+    }
+    this.setState({
+      cols: cols,
+      columnWidth: columnWidth,
+      scroll: scrollX != 0 ? scroll : null
+    })
   }
 
   /**
@@ -140,7 +229,26 @@ class TableComponent extends Component {
     }
   }
 
+  handleResize = (columnName, event, obj) => {
+
+    const { size } = obj
+    const { width } = size && size != null ? size : {}
+
+    let { columnWidth, scroll } = this.state
+    let columnOldWidth = _.cloneDeep(columnWidth[columnName])
+    columnWidth[columnName] = width
+
+    if (scroll && scroll != null) {
+      scroll['y'] = scroll['y'] + (width - columnOldWidth)
+    }
+    this.setState({
+      columnWidth: columnWidth,
+      scroll: scroll
+    })
+  }
+
   render() {
+    const { columnWidth, scroll, cols } = this.state
     const pagination =
       this.props.isShowPagination == true
         ? {
@@ -219,8 +327,14 @@ class TableComponent extends Component {
       }
       return dom
     }
+
     return (
       <Table
+        components={{
+          header: {
+            cell: ResizableTitle
+          }
+        }}
         dataSource={this.props.dataSource}
         bordered={this.props.hasBorder ? this.props.hasBorder : false}
         loading={this.props.loading}
@@ -230,24 +344,34 @@ class TableComponent extends Component {
         rowSelection={rowSelection}
         onChange={this.handleTableOnChange}
         onRow={tableOnRow}
-        scroll={this.props.scroll}
+        scroll={scroll}
       >
-        {this.props.cols
-          ? this.props.cols.map((col) => (
+        {cols
+          ? cols.map((col) => (
               <Table.Column
                 title={renderTitle(col)}
+                title={col.title}
                 //   filters={col.filterData}
                 //   filterMode={col.filterMode}
                 dataIndex={col.dataIndex}
                 key={col.dataIndex}
-                render={col.cell}
+                render={col.render}
                 align={col.align}
                 alignHeader={col.alignHeader}
-                width={col.width}
+                width={col.dataIndex ? columnWidth[col.dataIndex] : null}
+                textWrap={col?.textWrap || 'word-break'}
+                ellipsis={col?.ellipsis || true}
                 fixed={col.lock ? col.lock : false}
                 sorter={col.sortable ? col.sortable : false}
                 showSorterTooltip={false}
                 resizable={col.resizable == true ? true : false}
+                // onHeaderCell={col.onHeaderCell}
+                onHeaderCell={(column) => ({
+                  width: columnWidth[col.dataIndex],
+                  onResize: (event, obj) => {
+                    this.handleResize(col.dataIndex, event, obj)
+                  }
+                })}
               />
             ))
           : this.props.children}
